@@ -1,25 +1,19 @@
 package com.github.gcpdev.JsonValidatorWS
 
+import java.net.URLDecoder
 import javax.sql.DataSource
 
-import org.springframework.http.{HttpHeaders, HttpStatus, ResponseEntity}
-import org.springframework.web.bind.annotation._
-import org.springframework.web.bind.annotation.RequestMethod._
+import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
+import com.github.fge.jsonschema.core.report.{ProcessingMessage, ProcessingReport}
+import com.github.fge.jsonschema.main.{JsonSchema, JsonSchemaFactory}
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.http.{HttpHeaders, HttpStatus, ResponseEntity}
+import org.springframework.web.bind.annotation.RequestMethod._
+import org.springframework.web.bind.annotation._
 import spray.json._
-import java.net.URLDecoder
-import javax.xml.crypto.dsig.spec.ExcC14NParameterSpec
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.github.fge.jsonschema.core.exceptions.ProcessingException
-import com.github.fge.jsonschema.core.report.{ListProcessingReport, ProcessingMessage, ProcessingReport}
-import com.github.fge.jsonschema.main.JsonSchema
-import com.github.fge.jsonschema.main.JsonSchemaFactory
-import com.fasterxml.jackson.core.JsonFactory
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
-
-import com.github.fge.jsonschema.core.report.ProcessingMessage
+import scala.annotation.tailrec
+import scala.collection.GenTraversable
 
 
 
@@ -96,11 +90,22 @@ class ServiceController(@Autowired val schemaService: SchemaService, @Autowired 
 
     var message: String = ""
 
-
-
     //try to validate the Json input and then validate against the schema successfully, or get error message
     try {
+
       val validJsonInput = jsonInput.parseJson // if Json is not good, parse throws exception
+
+      def withoutValue(v: JsValue) = v match {
+        case JsNull => true
+        case JsString("") => true
+        case _ => false
+      }
+      def cleanJsonInput(json: JsValue): JsValue = json match {
+        case JsObject(fields) =>
+            JsObject(fields.filterNot(t => withoutValue(t._2)))
+        case other => other
+      }
+      var cleanedJsonValue = cleanJsonInput(validJsonInput)
 
       //gets the validator schema
       val valSchema: String = schemaService.getSchema(schemaId).schema
