@@ -75,6 +75,7 @@ class ServiceController(@Autowired val schemaService: SchemaService, @Autowired 
     new ResponseEntity(jsonResponse.toJson.compactPrint, new HttpHeaders, httpReturnStatus)
   }
 
+
   //validation path: handles PUT/POST actions in the /validate/{schemaId} path
   @PostMapping(path = Array("/validate/{schemaId}"))
   def validateSchema(@RequestBody json: String, @PathVariable schemaId: String): ResponseEntity[String] = {
@@ -95,14 +96,14 @@ class ServiceController(@Autowired val schemaService: SchemaService, @Autowired 
 
       val validJsonInput = jsonInput.parseJson // if Json is not good, parse throws exception
 
-      def withoutValue(v: JsValue) = v match {
+      //filter null values
+      def nullValue(v: JsValue) = v match {
         case JsNull => true
-        case JsString("") => true
         case _ => false
       }
-      def cleanJsonInput(json: JsValue): JsValue = json match {
+      def cleanJsonInput(json: JsValue): JsValue = json match{
         case JsObject(fields) =>
-            JsObject(fields.filterNot(t => withoutValue(t._2)))
+            JsObject(fields.filterNot(t => nullValue(t._2)))
         case other => other
       }
       var cleanedJsonValue = cleanJsonInput(validJsonInput)
@@ -119,7 +120,7 @@ class ServiceController(@Autowired val schemaService: SchemaService, @Autowired 
       val schema: JsonSchema = schemaFactory.getJsonSchema(jsonObj)
 
       //now converts the json input to a JsonNode
-      jsonObj = mapper.readTree(jsonInput)
+      jsonObj = mapper.readTree(cleanedJsonValue.compactPrint)
 
       val report: ProcessingReport = schema.validate(jsonObj)
 
